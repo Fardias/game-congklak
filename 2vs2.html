@@ -174,8 +174,101 @@
         // lubah besar kanan (Player 1)
         lubang.push({ x: 650, y: 150, r: 35, biji: 0, big: true });
 
+        function drawSeed(x, y, size = 4) {
+            // Gambar biji dengan gradient coklat
+            const gradient = ctx.createRadialGradient(x - 1, y - 1, 0, x, y, size);
+            gradient.addColorStop(0, "#ffffff");
+            gradient.addColorStop(0.7, "#ffffff");
+            gradient.addColorStop(1, "#ffffff");
+            
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            
+            // Highlight kecil untuk efek 3D
+            ctx.beginPath();
+            ctx.arc(x - 1, y - 1, size * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(139, 69, 19, 0.8)";
+            ctx.fill();
+        }
+
+        function drawSeedsInPit(pit) {
+            const count = pit.biji;
+            if (count === 0) return;
+            
+            const maxRadius = pit.r - 6;
+            const seedSize = pit.big ? 3 : 2.5;
+            
+            if (count === 1) {
+                drawSeed(pit.x, pit.y, seedSize);
+                return;
+            }
+            
+            // Untuk biji lebih dari 1, susun dalam pola melingkar
+            const positions = [];
+            
+            if (count <= 8) {
+                // Pola melingkar sederhana
+                const angleStep = (2 * Math.PI) / count;
+                const radius = Math.min(maxRadius * 0.6, count * 2);
+                
+                for (let i = 0; i < count; i++) {
+                    const angle = i * angleStep;
+                    const x = pit.x + Math.cos(angle) * radius;
+                    const y = pit.y + Math.sin(angle) * radius;
+                    positions.push({ x, y });
+                }
+            } else {
+                // Untuk biji banyak, susun dalam beberapa lingkaran
+                const innerCount = Math.min(6, count);
+                const outerCount = count - innerCount;
+                
+                // Lingkaran dalam
+                const innerAngleStep = (2 * Math.PI) / innerCount;
+                const innerRadius = maxRadius * 0.3;
+                
+                for (let i = 0; i < innerCount; i++) {
+                    const angle = i * innerAngleStep;
+                    const x = pit.x + Math.cos(angle) * innerRadius;
+                    const y = pit.y + Math.sin(angle) * innerRadius;
+                    positions.push({ x, y });
+                }
+                
+                // Lingkaran luar
+                if (outerCount > 0) {
+                    const outerAngleStep = (2 * Math.PI) / outerCount;
+                    const outerRadius = maxRadius * 0.7;
+                    
+                    for (let i = 0; i < outerCount; i++) {
+                        const angle = i * outerAngleStep;
+                        const x = pit.x + Math.cos(angle) * outerRadius;
+                        const y = pit.y + Math.sin(angle) * outerRadius;
+                        positions.push({ x, y });
+                    }
+                }
+            }
+            
+            // Gambar semua biji
+            positions.forEach(pos => {
+                drawSeed(pos.x, pos.y, seedSize);
+            });
+            
+            // Tampilkan angka jika biji terlalu banyak (lebih dari 15)
+            if (count > 15) {
+                ctx.fillStyle = "white";
+                ctx.font = "bold 12px sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.strokeStyle = "#451a03";
+                ctx.lineWidth = 2;
+                ctx.strokeText(count, pit.x, pit.y + pit.r + 15);
+                ctx.fillText(count, pit.x, pit.y + pit.r + 15);
+            }
+        }
+
         function drawlubang() {
-            lubang.forEach(pit => {
+            lubang.forEach((pit, index) => {
                 ctx.beginPath();
                 ctx.arc(pit.x, pit.y, pit.r, 0, Math.PI * 2);
 
@@ -188,12 +281,23 @@
                 ctx.strokeStyle = "#451a03";
                 ctx.stroke();
 
-                // Jumlah biji
+                // Gambar biji-biji
+                drawSeedsInPit(pit);
+                
+                // Tampilkan angka di bawah setiap lubang
                 ctx.fillStyle = "white";
-                ctx.font = "bold 16px sans-serif";
+                ctx.strokeStyle = "#451a03";
+                ctx.lineWidth = 3;
+                ctx.font = "bold 14px sans-serif";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
-                ctx.fillText(pit.biji, pit.x, pit.y);
+                
+                const textY = pit.y + pit.r + (pit.big ? 20 : 18);
+                
+                // Stroke untuk outline
+                ctx.strokeText(pit.biji, pit.x, textY);
+                // Fill untuk teks utama
+                ctx.fillText(pit.biji, pit.x, textY);
             });
         }
 
@@ -411,44 +515,81 @@
                 }
 
                 function getLubangTerakhir() {
-                    // cek posisi lubang terakhir
-                    if (getPosisiLubangTerakhir && biji == 0) {
-                        // console.log(`getPosisiLubangTerakhir = ${getPosisiLubangTerakhir}`);
+                    // Aturan Congklak: Jika biji terakhir jatuh di lubang kosong (yang sekarang berisi 1), 
+                    // maka giliran berakhir dan ganti pemain
+                    
+                    // Cek apakah lubang terakhir adalah rumah sendiri
+                    const isOwnHouse = (currentPlayer === 1 && getPosisiLubangTerakhir === 15) || 
+                                      (currentPlayer === 2 && getPosisiLubangTerakhir === 14);
+                    
+                    // Jika biji terakhir jatuh di rumah sendiri, pemain dapat giliran lagi
+                    if (isOwnHouse) {
+                        console.log("Biji terakhir di rumah sendiri, dapat giliran lagi!");
+                        return 0; // Tidak lanjut, tapi tidak ganti pemain
                     }
-
-                    // lanjut jalan untuk player 1
-                    // kosong kan posisi lubang akhir
-                    // lanjut ketika posisi lubang akhir !== 15 dan jumlah biji dilubang akhir > 0
-                    if (currentPlayer == 1 && getPosisiLubangTerakhir !== 15) {
-                        biji = ambilBijiLubangTerakhir;
-                        // cek biji terakhir
-                        if (ambilBijiLubangTerakhir > 0) {
-                            console.log("biji saat ini " + biji);
+                    
+                    // Cek apakah lubang terakhir adalah lubang kecil dan sebelumnya kosong
+                    const isSmallPit = getPosisiLubangTerakhir < 14;
+                    const wasEmpty = ambilBijiLubangTerakhir === 1; // Sekarang berisi 1, berarti sebelumnya kosong
+                    const isOwnPit = isOwnSmallPit(getPosisiLubangTerakhir, currentPlayer);
+                    
+                    if (isSmallPit && wasEmpty && isOwnPit) {
+                        // ATURAN MENEMBAK: Biji terakhir jatuh di lubang kosong milik sendiri
+                        const oppositeIdx = oppositeIndex(getPosisiLubangTerakhir);
+                        
+                        if (oppositeIdx !== -1 && lubang[oppositeIdx].biji > 0) {
+                            console.log(`MENEMBAK! Lubang ${getPosisiLubangTerakhir} menembak lubang ${oppositeIdx}`);
+                            console.log(`Mengambil ${lubang[oppositeIdx].biji} biji dari lawan`);
+                            
+                            // Ambil semua biji dari lubang lawan yang berseberangan
+                            const capturedSeeds = lubang[oppositeIdx].biji;
+                            lubang[oppositeIdx].biji = 0;
+                            
+                            // Ambil juga biji dari lubang sendiri (yang baru ditaruh)
+                            const ownSeed = lubang[getPosisiLubangTerakhir].biji;
                             lubang[getPosisiLubangTerakhir].biji = 0;
+                            
+                            // Masukkan semua biji yang ditembak ke rumah sendiri
+                            const totalCaptured = capturedSeeds + ownSeed;
+                            const ownHouseIdx = currentPlayer === 1 ? 15 : 14;
+                            lubang[ownHouseIdx].biji += totalCaptured;
+                            
+                            console.log(`Total biji yang masuk ke rumah: ${totalCaptured}`);
+                            render(); // Update tampilan setelah menembak
+                        } else {
+                            console.log("Biji terakhir jatuh di lubang kosong, tapi tidak bisa menembak (lubang lawan kosong)");
                         }
+                        
+                        return 0; // Berhenti, ganti pemain
+                    } else if (isSmallPit && wasEmpty) {
+                        console.log("Biji terakhir jatuh di lubang kosong lawan, giliran berakhir!");
+                        return 0; // Berhenti, ganti pemain
                     }
-
-                    // lanjut jalan untuk player 2
-                    // kosong kan posisi lubang akhir
-                    // lanjut ketika posisi lubang akhir !== 6 dan jumlah biji dilubang akhir > 0
-                    if (currentPlayer == 2 && getPosisiLubangTerakhir !== 14) {
-                        biji = ambilBijiLubangTerakhir;
-                        // cek biji terakhir
-                        if (ambilBijiLubangTerakhir > 0) {
-                            console.log("biji saat ini " + biji);
-                            lubang[getPosisiLubangTerakhir].biji = 0;
-                        }
+                    
+                    // Jika lubang terakhir berisi lebih dari 1 biji, lanjutkan permainan
+                    if (ambilBijiLubangTerakhir > 1) {
+                        console.log(`Lubang terakhir berisi ${ambilBijiLubangTerakhir} biji, ambil semua dan lanjut jalan!`);
+                        const newBiji = ambilBijiLubangTerakhir; // Ambil SEMUA biji dari lubang tersebut
+                        lubang[getPosisiLubangTerakhir].biji = 0; // Kosongkan lubang tersebut
+                        return newBiji;
                     }
-
-                    return biji;
+                    
+                    return 0; // Default: berhenti
                 }
 
-                if ((currentPlayer === 1 && i === 15) || (currentPlayer === 2 && i === 14)) {
-                    break;
+                // Cek apakah biji terakhir jatuh di rumah sendiri
+                const lastInOwnHouse = (currentPlayer === 1 && i === 15) || (currentPlayer === 2 && i === 14);
+                
+                if (lastInOwnHouse) {
+                    console.log("Biji terakhir di rumah sendiri, pemain dapat giliran lagi!");
+                    break; // Pemain tetap sama, tidak ganti
                 }
 
-
+                // Jika tidak di rumah sendiri, ganti pemain
                 currentPlayer = currentPlayer === 1 ? 2 : 1;
+                console.log(`Ganti ke Player ${currentPlayer}`);
+                
+                // Cek apakah pemain baru masih punya biji untuk dimainkan
                 if (currentPlayer === 1 && smallPitsEmpty(1)) {
                     currentPlayer = 2;
                 } else if (currentPlayer === 2 && smallPitsEmpty(2)) {
